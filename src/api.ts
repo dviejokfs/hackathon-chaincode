@@ -1,13 +1,14 @@
-import { ChainCallDTO, GalaChainResponse, GetMyProfileDto, RegisterUserDto } from "@gala-chain/api";
-import { ChainClient, ChainUser, gcclient, publicKeyContractAPI } from "@gala-chain/client";
+import { GetMyProfileDto, RegisterUserDto } from "@gala-chain/api";
+import { ChainUser, gcclient, publicKeyContractAPI } from "@gala-chain/client";
+import { json as strings } from "@helia/json";
 import cors from "cors";
 import express from "express";
 import fs from "fs";
+import { Helia, createHelia } from "helia";
+import { CID } from "multiformats/cid";
 import path from "path";
-import { v4 } from "uuid";
 
-import { AppleTreeDto, AppleTreesDto, FetchTreesDto, PagedTreesDto, PickAppleDto, Variety } from "./apples";
-import { CreateCourseDto, FetchCoursesDto, PagedCoursesDto } from "./apples/dtos";
+import * as dto from "./apples/dtos";
 
 const newUser = ChainUser.withRandomKeys();
 console.log("New user: ", newUser);
@@ -49,21 +50,21 @@ function getAdminPrivateKey() {
   return adminPrivateKeyString;
 }
 
-interface AppleContractAPI {
-  CreateCourse(dto: CreateCourseDto): Promise<GalaChainResponse<void>>;
-  FetchCourses(dto: FetchCoursesDto): Promise<GalaChainResponse<PagedCoursesDto>>;
-}
+// interface AppleContractAPI {
+//   CreateCourse(dto: CreateCourseDto): Promise<GalaChainResponse<void>>;
+//   FetchCourses(dto: FetchCoursesDto): Promise<GalaChainResponse<PagedCoursesDto>>;
+// }
 
-function appleContractAPI(client: ChainClient): AppleContractAPI {
-  return {
-    FetchCourses(dto: FetchCoursesDto) {
-      return client.evaluateTransaction("FetchCourses", dto, PagedCoursesDto);
-    },
-    CreateCourse(dto: CreateCourseDto) {
-      return client.submitTransaction("CreateCourse", dto) as Promise<GalaChainResponse<void>>;
-    }
-  };
-}
+// function appleContractAPI(client: ChainClient): AppleContractAPI {
+//   return {
+//     FetchCourses(dto: FetchCoursesDto) {
+//       return client.evaluateTransaction("FetchCourses", dto, PagedCoursesDto);
+//     },
+//     CreateCourse(dto: CreateCourseDto) {
+//       return client.submitTransaction("CreateCourse", dto) as Promise<GalaChainResponse<void>>;
+//     }
+//   };
+// }
 
 const pubKeyClient = gcclient
   .forConnectionProfile(params)
@@ -72,10 +73,8 @@ const pubKeyClient = gcclient
 
 const tokenClient = gcclient.forConnectionProfile(params).forContract(tokenContract);
 
-const courseClient = gcclient
-  .forConnectionProfile(params)
-  .forContract(appleContract)
-  .extendAPI(appleContractAPI);
+const courseClient = gcclient.forConnectionProfile(params).forContract(appleContract);
+
 app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
@@ -100,10 +99,84 @@ const sendValidationError = (res: express.Response, message: string) => {
   res.status(400).send({ message });
 };
 const dtoMap = {
-  CreateCourseDto: CreateCourseDto,
-  FetchCoursesDto: FetchCoursesDto,
-  GetMyProfileDto: GetMyProfileDto
+  GetMyProfileDto: GetMyProfileDto,
+  AppleTreeDto: dto.AppleTreeDto,
+  AppleTreesDto: dto.AppleTreesDto,
+  CreateCourseDto: dto.CreateCourseDto,
+  FetchCreatedCoursesDto: dto.FetchCreatedCoursesDto,
+  FetchEnrolledCoursesDto: dto.FetchEnrolledCoursesDto,
+  AddBalanceToStudentDto: dto.AddBalanceToStudentDto,
+  FetchPurchasedCoursesDto: dto.FetchPurchasedCoursesDto,
+  PickAppleDto: dto.PickAppleDto,
+  FetchCoursesDto: dto.FetchCoursesDto,
+  FetchBalanceOfStudentDto: dto.FetchBalanceOfStudentDto,
+  PagedCoursesDto: dto.PagedCoursesDto,
+  StudentPurchaseWithCourseDto: dto.StudentPurchaseWithCourseDto,
+  PagedStudentPurchaseDto: dto.PagedStudentPurchaseDto,
+  StudentBalanceDto: dto.StudentBalanceDto,
+  FetchTreesDto: dto.FetchTreesDto,
+  PagedTreesDto: dto.PagedTreesDto,
+  EnrollInCourseDto: dto.EnrollInCourseDto,
+  FetchMyCourseDto: dto.FetchMyCourseDto,
+  FetchCourseDto: dto.FetchCourseDto,
+  UpdateCourseDto: dto.UpdateCourseDto,
+  UpdateLessonDto: dto.UpdateLessonDto,
+  UpdateChapterDto: dto.UpdateChapterDto,
+  CreateChapterDto: dto.CreateChapterDto,
+  CreateLessonDto: dto.CreateLessonDto
 };
+let helia: Helia;
+createHelia().then((h) => {
+  helia = h;
+});
+app.get("/ipfs/get/:cid", async (req, res) => {
+  const { cid } = req.params;
+  if (!cid) {
+    sendValidationError(res, "cid is required");
+    return;
+  }
+  if (!helia) {
+    sendValidationError(res, "Helia not initialized");
+    return;
+  }
+  try {
+    const s = strings(helia);
+    const cidParsed = CID.parse(cid);
+    const myString = await s.get(cidParsed);
+    res.send({
+      data: myString
+    });
+  } catch (e) {
+    console.error(e);
+    res.status(500).send({
+      message: e.toString()
+    });
+  }
+});
+app.post("/ipfs/add", async (req, res) => {
+  try {
+    if (!helia) {
+      sendValidationError(res, "Helia not initialized");
+      return;
+    }
+    const { data } = req.body;
+    if (!data) {
+      sendValidationError(res, "data is required");
+      return;
+    }
+    const s = strings(helia);
+    const myImmutableAddress = await s.add(data);
+    res.send({
+      cid: myImmutableAddress
+    });
+  } catch (e) {
+    console.error(e);
+    res.status(500).send({
+      message: e.toString()
+    });
+  }
+});
+
 app.post("/submit", async (req, res) => {
   try {
     const { data, fcn, contract } = req.body;

@@ -22,9 +22,9 @@ import {
 } from "@gala-chain/api";
 import BigNumber from "bignumber.js";
 import { Exclude } from "class-transformer";
-import { IsArray, IsString } from "class-validator";
+import { IsArray, IsBoolean, IsOptional, IsString } from "class-validator";
 
-import { Variety } from "./types";
+import { CourseStatus, Variety } from "./types";
 
 export class AppleTree extends ChainObject {
   @Exclude()
@@ -118,8 +118,8 @@ export class Course extends ChainObject {
   @BigNumberProperty()
   public Price: BigNumber;
 
-  @IsString()
-  public Status: string;
+  @StringEnumProperty(CourseStatus)
+  public Status: CourseStatus;
 
   constructor(
     CourseID: string,
@@ -127,7 +127,7 @@ export class Course extends ChainObject {
     Title: string,
     Description: string,
     Price: BigNumber,
-    Status: string
+    Status: CourseStatus
   ) {
     super();
     this.CourseID = CourseID;
@@ -147,7 +147,8 @@ export class Student extends ChainObject {
   @IsString()
   public readonly StudentID: string;
 
-  public tokens: number;
+  @BigNumberProperty()
+  public tokens: BigNumber;
 
   @IsArray()
   public EnrolledCourses: string[];
@@ -155,11 +156,73 @@ export class Student extends ChainObject {
   @IsArray()
   public CompletedCourses: string[];
 
-  constructor(StudentID: string, EnrolledCourses: string[], CompletedCourses: string[]) {
+  constructor(StudentID: string, tokens: BigNumber, EnrolledCourses: string[], CompletedCourses: string[]) {
     super();
     this.StudentID = StudentID;
+    this.tokens = tokens;
     this.EnrolledCourses = EnrolledCourses;
     this.CompletedCourses = CompletedCourses;
+  }
+}
+export class StudentPurchase extends ChainObject {
+  @Exclude()
+  static INDEX_KEY = "STUP";
+
+  @ChainKey({ position: 0 })
+  @IsString()
+  public StudentID: string;
+
+  @ChainKey({ position: 1 })
+  @IsString()
+  public CourseID: string;
+
+  @IsString()
+  public PurchaseID: string;
+  @IsString()
+  public TXID: string;
+  @IsString()
+  public CreatorCourseID: string;
+  @BigNumberProperty()
+  public Timestamp: BigNumber;
+
+  constructor(
+    StudentID: string,
+    CourseID: string,
+    PurchaseID: string,
+    TXID: string,
+    CreatorCourseID: string,
+    Timestamp: BigNumber
+  ) {
+    super();
+    this.StudentID = StudentID;
+    this.CourseID = CourseID;
+    this.PurchaseID = PurchaseID;
+    this.TXID = TXID;
+    this.CreatorCourseID = CreatorCourseID;
+    this.Timestamp = Timestamp;
+  }
+}
+
+export class Chapter extends ChainObject {
+  @Exclude()
+  static INDEX_KEY = "CHAP";
+
+  @ChainKey({ position: 0 })
+  @IsString()
+  public CourseID: string;
+
+  @ChainKey({ position: 1 })
+  @IsString()
+  public readonly ChapterID: string;
+
+  @IsString()
+  public Title: string;
+
+  constructor(ChapterID: string, CourseID: string, Title: string) {
+    super();
+    this.ChapterID = ChapterID;
+    this.CourseID = CourseID;
+    this.Title = Title;
   }
 }
 
@@ -173,6 +236,10 @@ export class Lesson extends ChainObject {
 
   @ChainKey({ position: 1 })
   @IsString()
+  public ChapterID: string;
+
+  @ChainKey({ position: 2 })
+  @IsString()
   public readonly LessonID: string;
 
   @IsString()
@@ -182,15 +249,67 @@ export class Lesson extends ChainObject {
   public Description: string;
 
   @IsString()
-  public Content: string;
+  public IPFSCID: string;
 
-  constructor(LessonID: string, CourseID: string, Title: string, Description: string, Content: string) {
+  @IsOptional()
+  public NFTClassKey: string;
+
+  constructor(
+    LessonID: string,
+    ChapterID: string,
+    CourseID: string,
+    Title: string,
+    Description: string,
+    IPFSCID: string,
+    NFTClassKey?: string
+  ) {
     super();
     this.LessonID = LessonID;
+    this.ChapterID = ChapterID;
     this.CourseID = CourseID;
     this.Title = Title;
     this.Description = Description;
-    this.Content = Content;
+    this.IPFSCID = IPFSCID;
+    if (NFTClassKey) {
+      this.NFTClassKey = NFTClassKey;
+    }
+  }
+}
+export class StudentNFT extends ChainObject {
+  @Exclude()
+  static INDEX_KEY = "STUNFT";
+
+  @ChainKey({ position: 0 })
+  @IsString()
+  public StudentID: string;
+
+  @ChainKey({ position: 1 })
+  @IsString()
+  public NFTClassKey: string;
+
+  @IsString()
+  public NFTInstanceID: string;
+  @IsString()
+  public CourseID: string;
+  @IsString()
+  public ChapterID: string;
+  @IsString()
+  public LessonID: string;
+  constructor(
+    StudentID: string,
+    NFTClassKey: string,
+    NFTInstanceID: string,
+    CourseID: string,
+    ChapterID: string,
+    LessonID: string
+  ) {
+    super();
+    this.StudentID = StudentID;
+    this.NFTClassKey = NFTClassKey;
+    this.NFTInstanceID = NFTInstanceID;
+    this.CourseID = CourseID;
+    this.ChapterID = ChapterID;
+    this.LessonID = LessonID;
   }
 }
 

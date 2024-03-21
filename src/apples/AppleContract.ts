@@ -12,23 +12,57 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import { Evaluate, GalaChainContext, GalaContract, Submit } from "@gala-chain/chaincode";
+import { ChainObject, FulfillMintDto, TokenClass, TokenClassKey } from "@gala-chain/api";
+import { Evaluate, GalaChainContext, GalaContract, Submit, fetchTokenClass } from "@gala-chain/chaincode";
 
 import { version } from "../../package.json";
+import { StudentNFT } from "./AppleTree";
 import {
-  AppleTreeDto,
-  AppleTreesDto,
+  AddBalanceToStudentDto,
+  CompleteLessonDto,
+  CourseDto,
+  CreateChapterDto,
   CreateCourseDto,
+  CreateLessonDto,
+  CreateNFTForLessonDto,
+  EnrollInCourseDto,
+  FetchBalanceOfStudentDto,
+  FetchCourseDto,
   FetchCoursesDto,
-  FetchTreesDto,
+  FetchCreatedCoursesDto,
+  FetchEnrolledCoursesDto,
+  FetchLessonDto,
+  FetchMyCourseDto,
+  GetStudentNFTsDto,
+  LessonDto,
   PagedCoursesDto,
-  PagedTreesDto,
-  PickAppleDto
+  PagedStudentNFTDto,
+  PagedStudentPurchaseDto,
+  StudentBalanceDto,
+  UpdateChapterDto,
+  UpdateCourseDto,
+  UpdateLessonDto
 } from "./dtos";
-import { fetchTrees } from "./fetchTrees";
-import { createCourse, fetchCourses } from "./lib";
-import { pickApple } from "./pickApple";
-import { plantTree, plantTrees } from "./plantTrees";
+import {
+  addBalanceToStudent,
+  completeLesson,
+  createChapter,
+  createCourse,
+  createLesson,
+  createNFTForLesson,
+  editChapter,
+  editCourse,
+  editLesson,
+  enrollInCourse,
+  fetchAllInfoCourse,
+  fetchCourses,
+  fetchCreatedCourses,
+  fetchEnrolledCourses,
+  fetchLesson,
+  fetchMyCourseAll,
+  getCurrentStudent,
+  getStudentNFTWithPagination
+} from "./lib";
 
 export class AppleContract extends GalaContract {
   constructor() {
@@ -41,38 +75,101 @@ export class AppleContract extends GalaContract {
   public async CreateCourse(ctx: GalaChainContext, dto: CreateCourseDto): Promise<void> {
     await createCourse(ctx, dto);
   }
-  public async EditCourse() {}
-  public async CreateLesson() {}
-  public async EditLesson() {}
-  public async DeleteLesson() {}
 
-  public async AddBalanceToStudent() {
+  @Submit({
+    in: UpdateCourseDto
+  })
+  public async EditCourse(ctx: GalaChainContext, dto: UpdateCourseDto): Promise<void> {
+    // check if course exists
+    // if exists, update course
+    await editCourse(ctx, dto);
+  }
+  @Submit({
+    in: CreateChapterDto
+  })
+  public async CreateChapter(ctx: GalaChainContext, dto: CreateChapterDto): Promise<void> {
+    await createChapter(ctx, dto);
+  }
+  @Submit({
+    in: UpdateChapterDto
+  })
+  public async EditChapter(ctx: GalaChainContext, dto: UpdateChapterDto) {
+    await editChapter(ctx, dto);
+  }
+
+  @Submit({
+    in: CreateLessonDto
+  })
+  public async CreateLesson(ctx: GalaChainContext, dto: CreateLessonDto) {
+    await createLesson(ctx, dto);
+  }
+  @Submit({
+    in: UpdateLessonDto
+  })
+  public async EditLesson(ctx: GalaChainContext, dto: UpdateLessonDto) {
+    await editLesson(ctx, dto);
+  }
+  @Submit({
+    in: FetchLessonDto,
+    out: LessonDto
+  })
+  public async FetchLesson(ctx: GalaChainContext, dto: FetchLessonDto) {
+    const lesson = await fetchLesson(ctx, dto.courseId, dto.chapterId, dto.lessonId);
+    return new LessonDto(lesson);
+  }
+  @Submit({
+    in: AddBalanceToStudentDto
+  })
+  public async AddBalanceToStudent(ctx: GalaChainContext, dto: AddBalanceToStudentDto) {
+    await addBalanceToStudent(ctx, dto);
     // check if student exists
     // if exists, add balance
   }
-  public async EnrollStudentInCourse() {
-    // check if student is already enrolled
-    // check if student has enough balance
+  @Submit({
+    in: CreateNFTForLessonDto
+  })
+  public async CreateNFTForLesson(ctx: GalaChainContext, dto: CreateNFTForLessonDto) {
+    await createNFTForLesson(ctx, dto);
   }
-  public async CompleteLesson() {
-    // check if student is enrolled in course + give tokens
-    // mint nft for student
+
+  @Evaluate({
+    in: FetchBalanceOfStudentDto,
+    out: StudentBalanceDto
+  })
+  public async FetchBalanceOfStudent(
+    ctx: GalaChainContext,
+    _: FetchBalanceOfStudentDto
+  ): Promise<StudentBalanceDto> {
+    const student = await getCurrentStudent(ctx);
+    return new StudentBalanceDto(student.tokens.toNumber());
   }
-  public async CompleteCourse() {
-    // check if student has completed all lessons
-    // mint nft for student + vc
+  @Evaluate({
+    in: FetchEnrolledCoursesDto,
+    out: PagedStudentPurchaseDto
+  })
+  public async FetchEnrolledCourses(ctx: GalaChainContext, dto: FetchEnrolledCoursesDto) {
+    return await fetchEnrolledCourses(ctx, dto);
   }
-  public async FetchStudentCourses() {
-    // get all courses for student
+  @Submit({
+    in: CompleteLessonDto,
+    out: StudentNFT
+  })
+  public async CompleteLesson(ctx: GalaChainContext, dto: CompleteLessonDto): Promise<StudentNFT> {
+    return await completeLesson(ctx, dto);
   }
-  public async FetchStudentCourse() {
-    // get course for student
+
+  @Evaluate({
+    in: GetStudentNFTsDto,
+    out: PagedStudentNFTDto
+  })
+  public async GetStudentNFTs(ctx: GalaChainContext, dto: GetStudentNFTsDto): Promise<PagedStudentNFTDto> {
+    return await getStudentNFTWithPagination(ctx, ctx.callingUser, dto);
   }
-  public async FetchStudentNFTs() {
-    // get all nfts for student
-  }
-  public async FetchStudentNFT() {
-    // get nft for student
+  @Submit({
+    in: EnrollInCourseDto
+  })
+  public async EnrollInCourse(ctx: GalaChainContext, dto: EnrollInCourseDto) {
+    await enrollInCourse(ctx, dto);
   }
 
   @Evaluate({
@@ -81,5 +178,49 @@ export class AppleContract extends GalaContract {
   })
   public async FetchCourses(ctx: GalaChainContext, dto: FetchCoursesDto): Promise<PagedCoursesDto> {
     return await fetchCourses(ctx, dto);
+  }
+
+  @Evaluate({
+    in: FetchCourseDto,
+    out: CourseDto
+  })
+  public async FetchCourse(ctx: GalaChainContext, dto: FetchCourseDto): Promise<CourseDto> {
+    console.log("calling user", ctx.callingUser, decodeURIComponent(dto.creator), dto.courseId);
+    return await fetchAllInfoCourse(ctx, dto.creator, dto.courseId);
+  }
+
+  @Evaluate({
+    in: FetchLessonDto,
+    out: CourseDto
+  })
+  public async FetchLessonNFT(ctx: GalaChainContext, dto: FetchLessonDto): Promise<TokenClass> {
+    const lesson = await fetchLesson(ctx, dto.courseId, dto.chapterId, dto.lessonId);
+    const parts = lesson.NFTClassKey.split(ChainObject.ID_SPLIT_CHAR);
+    const tokenClassKey = new TokenClassKey();
+    const [collection, category, type, additionalKey] = parts;
+    tokenClassKey.collection = collection;
+    tokenClassKey.category = category;
+    tokenClassKey.type = type;
+    tokenClassKey.additionalKey = additionalKey;
+    return fetchTokenClass(ctx, tokenClassKey);
+  }
+
+  @Evaluate({
+    in: FetchMyCourseDto,
+    out: CourseDto
+  })
+  public async FetchMyCourse(ctx: GalaChainContext, dto: FetchCourseDto): Promise<CourseDto> {
+    return await fetchMyCourseAll(ctx, dto.courseId);
+  }
+
+  @Evaluate({
+    in: FetchCreatedCoursesDto,
+    out: PagedCoursesDto
+  })
+  public async FetchCreatedCourses(
+    ctx: GalaChainContext,
+    dto: FetchCreatedCoursesDto
+  ): Promise<PagedCoursesDto> {
+    return await fetchCreatedCourses(ctx, dto);
   }
 }
