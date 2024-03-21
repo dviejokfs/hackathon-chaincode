@@ -1,14 +1,15 @@
-FROM node:16-alpine AS build
+FROM node:18-alpine AS build
 
 WORKDIR /usr/src/app
 
 COPY . .
+RUN apk add --no-cache --virtual .gyp python3 make g++ 
 
 RUN npm ci --include=dev
 RUN npm run build
 RUN npm prune --production
 
-FROM gcr.io/distroless/nodejs16-debian11 as production
+FROM gcr.io/distroless/nodejs18-debian11 as production
 
 ARG CC_SERVER_ADDRESS=0.0.0.0
 ARG CC_SERVER_PORT=7052
